@@ -1,0 +1,783 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Football Live</title>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <style>
+    * { box-sizing: border-box; }
+    :root {
+      --bg: #07111f;
+      --panel: rgba(13, 23, 39, 0.88);
+      --panel-2: #0f1b2d;
+      --line: rgba(255,255,255,0.08);
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --live: #ef4444;
+      --accent: #22c55e;
+      --accent-2: #16a34a;
+      --shadow: 0 18px 45px rgba(0,0,0,0.28);
+      --radius: 22px;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background:
+        radial-gradient(circle at top left, rgba(34,197,94,0.12), transparent 26%),
+        radial-gradient(circle at top right, rgba(59,130,246,0.10), transparent 20%),
+        linear-gradient(180deg, #07111f 0%, #0a1526 100%);
+      color: var(--text);
+      font-family: Inter, Arial, sans-serif;
+    }
+
+    a { color: inherit; text-decoration: none; }
+
+    .container {
+      width: min(1180px, calc(100% - 28px));
+      margin: 0 auto;
+      padding: 18px 0 38px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 10px 0 18px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 800;
+      letter-spacing: .3px;
+      font-size: 22px;
+    }
+
+    .brand-mark {
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      box-shadow: 0 10px 25px rgba(34,197,94,0.25);
+      color: #04110a;
+      font-weight: 900;
+    }
+
+    .nav {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .nav a {
+      padding: 10px 14px;
+      border-radius: 999px;
+      font-size: 13px;
+      color: #dbe4ef;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(180deg, rgba(15,27,45,0.96) 0%, rgba(9,18,31,0.98) 100%);
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      box-shadow: var(--shadow);
+      padding: 24px;
+    }
+
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: auto -10% -45% auto;
+      width: 320px;
+      height: 320px;
+      background: radial-gradient(circle, rgba(34,197,94,0.18), transparent 60%);
+      pointer-events: none;
+    }
+
+    .hero-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+
+    .live-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 14px;
+      border-radius: 999px;
+      background: rgba(239,68,68,0.14);
+      border: 1px solid rgba(239,68,68,0.25);
+      color: #fecaca;
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .6px;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--live);
+    }
+
+    .league-pill {
+      padding: 9px 14px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.07);
+      color: #cbd5e1;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.1fr .9fr;
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .match-panel, .score-panel {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: var(--radius);
+      padding: 20px;
+      backdrop-filter: blur(8px);
+    }
+
+    .meta-label {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 10px;
+    }
+
+    .match-title {
+      margin: 0;
+      font-size: 15px;
+      color: #d8e3ee;
+      font-weight: 700;
+      letter-spacing: .3px;
+      text-transform: uppercase;
+    }
+
+    .teams {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      gap: 14px;
+      margin-top: 18px;
+    }
+
+    .team {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .team.right {
+      justify-content: flex-end;
+      text-align: right;
+      flex-direction: row-reverse;
+    }
+
+    .team-logo {
+      width: 62px;
+      height: 62px;
+      border-radius: 18px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.09), rgba(255,255,255,0.03));
+      border: 1px solid rgba(255,255,255,0.08);
+      display: grid;
+      place-items: center;
+      font-weight: 900;
+      color: #dbeafe;
+      flex: 0 0 auto;
+    }
+
+    .team-name {
+      font-size: 26px;
+      font-weight: 800;
+      line-height: 1.08;
+    }
+
+    .vs {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.08);
+      color: #cbd5e1;
+      font-weight: 800;
+    }
+
+    .sub-meta {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 18px;
+    }
+
+    .sub-pill {
+      background: rgba(255,255,255,0.045);
+      border: 1px solid rgba(255,255,255,0.06);
+      color: #d5dee8;
+      border-radius: 999px;
+      padding: 10px 12px;
+      font-size: 13px;
+    }
+
+    .score-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .status-label {
+      color: #cbd5e1;
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+    }
+
+    .minute {
+      font-size: 42px;
+      font-weight: 900;
+      line-height: 1;
+      margin: 8px 0 12px;
+    }
+
+    .score {
+      font-size: 74px;
+      line-height: .95;
+      font-weight: 900;
+      letter-spacing: -2px;
+      margin: 0;
+    }
+
+    .score-caption {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 8px;
+    }
+
+    .player-section {
+      margin-top: 18px;
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: 18px;
+    }
+
+    .player-card, .side-card, .section-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .player-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 18px;
+      background: rgba(255,255,255,0.025);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      flex-wrap: wrap;
+    }
+
+    .player-title {
+      font-size: 18px;
+      font-weight: 800;
+    }
+
+    .quality-pills {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .quality-pills span {
+      padding: 8px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      color: #dbe4ef;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .player-wrap {
+      background: #000;
+      aspect-ratio: 16 / 9;
+    }
+
+    video {
+      width: 100%;
+      height: 100%;
+      display: block;
+      background: #000;
+    }
+
+    .player-note {
+      padding: 14px 18px 18px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    .side-card {
+      padding: 18px;
+    }
+
+    .side-title {
+      margin: 0 0 14px;
+      font-size: 18px;
+      font-weight: 800;
+    }
+
+    .timeline {
+      display: grid;
+      gap: 12px;
+    }
+
+    .timeline-item {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      padding: 12px;
+      border-radius: 16px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .timeline-time {
+      min-width: 48px;
+      font-weight: 800;
+      color: #bbf7d0;
+    }
+
+    .timeline-text {
+      color: #d7e2ee;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .grid-2 {
+      margin-top: 18px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+
+    .section-card {
+      padding: 18px;
+    }
+
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .section-title {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 800;
+    }
+
+    .muted {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .match-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .match-item {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+      padding: 14px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .match-item strong {
+      display: block;
+      font-size: 15px;
+      margin-bottom: 5px;
+    }
+
+    .match-time {
+      padding: 10px 12px;
+      border-radius: 999px;
+      background: rgba(34,197,94,0.10);
+      border: 1px solid rgba(34,197,94,0.18);
+      font-size: 12px;
+      font-weight: 800;
+      color: #bbf7d0;
+      white-space: nowrap;
+    }
+
+    .league-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+
+    .league-card {
+      padding: 16px;
+      border-radius: 18px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+      border: 1px solid rgba(255,255,255,0.05);
+      min-height: 94px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .league-card span {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .footer {
+      color: #7f8ea3;
+      text-align: center;
+      font-size: 13px;
+      padding-top: 22px;
+    }
+
+    .status-live { color: #fecaca; }
+    .status-soon { color: #fde68a; }
+    .status-ft { color: #cbd5e1; }
+
+    @media (max-width: 980px) {
+      .hero-grid,
+      .player-section,
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+      .score-panel { order: -1; }
+    }
+
+    @media (max-width: 720px) {
+      .container { width: min(100% - 16px, 1180px); }
+      .hero { padding: 16px; border-radius: 22px; }
+      .match-panel, .score-panel, .section-card, .side-card { padding: 16px; }
+      .team-name { font-size: 18px; }
+      .team-logo { width: 50px; height: 50px; border-radius: 14px; }
+      .vs { width: 46px; height: 46px; font-size: 13px; }
+      .score { font-size: 58px; }
+      .minute { font-size: 32px; }
+      .topbar { align-items: flex-start; flex-direction: column; }
+      .league-grid { grid-template-columns: 1fr; }
+      .nav { gap: 8px; }
+      .nav a { font-size: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">F</div>
+        <div>Football Live</div>
+      </div>
+      <nav class="nav">
+        <a href="#live">Эфир</a>
+        <a href="#next">Следующие матчи</a>
+        <a href="#leagues">Турниры</a>
+      </nav>
+    </header>
+
+    <section class="hero">
+      <div class="hero-top">
+        <div class="live-badge" id="liveBadge"><span class="dot"></span><span id="liveBadgeText">СКОРО В ЭФИРЕ</span></div>
+        <div class="league-pill" id="leagueName">Лига чемпионов УЕФА</div>
+      </div>
+
+      <div class="hero-grid">
+        <div class="match-panel">
+          <div class="meta-label">Главный матч</div>
+          <h1 class="match-title" id="matchTitle">Прямая трансляция матча</h1>
+
+          <div class="teams">
+            <div class="team">
+              <div class="team-logo" id="homeLogo">H</div>
+              <div>
+                <div class="team-name" id="homeTeam">Home Team</div>
+              </div>
+            </div>
+            <div class="vs">VS</div>
+            <div class="team right">
+              <div class="team-logo" id="awayLogo">A</div>
+              <div>
+                <div class="team-name" id="awayTeam">Away Team</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="sub-meta">
+            <div class="sub-pill" id="matchDate">Сегодня · 20:00</div>
+            <div class="sub-pill" id="stadiumName">Стадион: скоро</div>
+            <div class="sub-pill" id="commentText">Статус: подготовка эфира</div>
+          </div>
+        </div>
+
+        <div class="score-panel">
+          <div class="score-top">
+            <div class="status-label" id="statusLabel">СКОРО</div>
+            <div class="muted">Автообновление</div>
+          </div>
+          <div class="minute" id="matchMinute">—</div>
+          <div class="score" id="matchScore">0 : 0</div>
+          <div class="score-caption" id="scoreCaption">Счёт и минута появятся автоматически после подключения API матча.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="player-section" id="live">
+      <div class="player-card">
+        <div class="player-head">
+          <div class="player-title">Прямой эфир</div>
+          <div class="quality-pills">
+            <span>Auto</span>
+            <span>720p</span>
+            <span>480p</span>
+          </div>
+        </div>
+        <div class="player-wrap">
+          <video id="video" controls playsinline poster="">
+            <source src="" type="application/x-mpegURL">
+            Ваш браузер не поддерживает видео.
+          </video>
+        </div>
+        <div class="player-note">
+          Вставь ссылку на свой HLS-поток в переменную <b>STREAM_URL</b>. Если поток ещё не подключён, сайт всё равно будет красиво работать как посадочная страница матча.
+        </div>
+      </div>
+
+      <aside class="side-card">
+        <h2 class="side-title">События матча</h2>
+        <div class="timeline" id="timelineList">
+          <div class="timeline-item"><div class="timeline-time">—</div><div class="timeline-text">После подключения API здесь можно показывать голы, карточки и замены.</div></div>
+          <div class="timeline-item"><div class="timeline-time">HT</div><div class="timeline-text">Перерыв и обновление статистики матча.</div></div>
+          <div class="timeline-item"><div class="timeline-time">FT</div><div class="timeline-text">Финальный свисток и итоговый счёт.</div></div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="grid-2">
+      <div class="section-card" id="next">
+        <div class="section-head">
+          <h2 class="section-title">Следующие матчи</h2>
+          <div class="muted">Секция-заготовка</div>
+        </div>
+        <div class="match-list">
+          <div class="match-item">
+            <div>
+              <strong>Арсенал — Ливерпуль</strong>
+              <div class="muted">АПЛ · Большой матч тура</div>
+            </div>
+            <div class="match-time">ЗАВТРА · 18:30</div>
+          </div>
+          <div class="match-item">
+            <div>
+              <strong>Интер — Милан</strong>
+              <div class="muted">Серия A · Дерби</div>
+            </div>
+            <div class="match-time">ЧТ · 21:45</div>
+          </div>
+          <div class="match-item">
+            <div>
+              <strong>Барселона — Атлетико</strong>
+              <div class="muted">Ла Лига · Центральный матч</div>
+            </div>
+            <div class="match-time">ПТ · 22:00</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-card" id="leagues">
+        <div class="section-head">
+          <h2 class="section-title">Популярные турниры</h2>
+          <div class="muted">Лёгкая навигация</div>
+        </div>
+        <div class="league-grid">
+          <div class="league-card"><strong>Лига чемпионов</strong><span>Главные европейские матчи</span></div>
+          <div class="league-card"><strong>АПЛ</strong><span>Английская Премьер-лига</span></div>
+          <div class="league-card"><strong>Ла Лига</strong><span>Испания и топ-клубы</span></div>
+          <div class="league-card"><strong>Серия A</strong><span>Италия и дерби</span></div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      © 2026 Football Live · Красивый лёгкий сайт для одной трансляции
+    </footer>
+  </div>
+
+  <script>
+    const STREAM_URL = ''; // пример: 'https://example.com/live/index.m3u8'
+    const MATCH_API_URL = '/api/match'; // сюда потом подключишь свой backend
+    const POLL_INTERVAL = 30000;
+
+    const fallbackData = {
+      home: 'Manchester City',
+      away: 'Real Madrid',
+      homeScore: 0,
+      awayScore: 0,
+      minute: null,
+      status: 'SOON',
+      league: 'Лига чемпионов УЕФА',
+      title: 'Прямая трансляция матча',
+      matchDate: 'Сегодня · 20:00',
+      stadium: 'Стадион: скоро',
+      note: 'Статус: ожидание подключения данных'
+    };
+
+    const ui = {
+      homeTeam: document.getElementById('homeTeam'),
+      awayTeam: document.getElementById('awayTeam'),
+      homeLogo: document.getElementById('homeLogo'),
+      awayLogo: document.getElementById('awayLogo'),
+      matchTitle: document.getElementById('matchTitle'),
+      matchDate: document.getElementById('matchDate'),
+      stadiumName: document.getElementById('stadiumName'),
+      commentText: document.getElementById('commentText'),
+      leagueName: document.getElementById('leagueName'),
+      statusLabel: document.getElementById('statusLabel'),
+      matchMinute: document.getElementById('matchMinute'),
+      matchScore: document.getElementById('matchScore'),
+      scoreCaption: document.getElementById('scoreCaption'),
+      liveBadgeText: document.getElementById('liveBadgeText'),
+      liveBadge: document.getElementById('liveBadge')
+    };
+
+    function initials(name) {
+      return (name || '?')
+        .split(' ')
+        .filter(Boolean)
+        .slice(0, 2)
+        .map(word => word[0])
+        .join('')
+        .toUpperCase();
+    }
+
+    function normalizeStatus(status) {
+      const s = String(status || '').toUpperCase();
+      if (['LIVE', '1H', '2H', 'IN_PLAY', 'H1', 'H2'].includes(s)) return 'LIVE';
+      if (['HT', 'HALFTIME', 'PAUSED'].includes(s)) return 'HT';
+      if (['FT', 'FINISHED', 'ENDED'].includes(s)) return 'FT';
+      return 'SOON';
+    }
+
+    function renderMatch(data) {
+      const home = data.home || fallbackData.home;
+      const away = data.away || fallbackData.away;
+      const homeScore = Number.isFinite(data.homeScore) ? data.homeScore : fallbackData.homeScore;
+      const awayScore = Number.isFinite(data.awayScore) ? data.awayScore : fallbackData.awayScore;
+      const minute = data.minute;
+      const status = normalizeStatus(data.status);
+
+      ui.homeTeam.textContent = home;
+      ui.awayTeam.textContent = away;
+      ui.homeLogo.textContent = initials(home);
+      ui.awayLogo.textContent = initials(away);
+      ui.matchTitle.textContent = data.title || `${home} — ${away}`;
+      ui.matchDate.textContent = data.matchDate || fallbackData.matchDate;
+      ui.stadiumName.textContent = data.stadium || fallbackData.stadium;
+      ui.commentText.textContent = data.note || fallbackData.note;
+      ui.leagueName.textContent = data.league || fallbackData.league;
+      ui.matchScore.textContent = `${homeScore} : ${awayScore}`;
+
+      if (status === 'LIVE') {
+        ui.statusLabel.textContent = 'LIVE';
+        ui.statusLabel.className = 'status-label status-live';
+        ui.liveBadgeText.textContent = 'СЕЙЧАС В ЭФИРЕ';
+        ui.matchMinute.textContent = minute ? `${minute}'` : 'LIVE';
+        ui.scoreCaption.textContent = 'Счёт и минута обновляются автоматически.';
+      } else if (status === 'HT') {
+        ui.statusLabel.textContent = 'ПЕРЕРЫВ';
+        ui.statusLabel.className = 'status-label status-soon';
+        ui.liveBadgeText.textContent = 'ПЕРЕРЫВ';
+        ui.matchMinute.textContent = 'HT';
+        ui.scoreCaption.textContent = 'Идёт перерыв. Табло обновится после начала второго тайма.';
+      } else if (status === 'FT') {
+        ui.statusLabel.textContent = 'ЗАВЕРШЁН';
+        ui.statusLabel.className = 'status-label status-ft';
+        ui.liveBadgeText.textContent = 'МАТЧ ЗАВЕРШЁН';
+        ui.matchMinute.textContent = 'FT';
+        ui.scoreCaption.textContent = 'Финальный счёт матча.';
+      } else {
+        ui.statusLabel.textContent = 'СКОРО';
+        ui.statusLabel.className = 'status-label status-soon';
+        ui.liveBadgeText.textContent = 'СКОРО В ЭФИРЕ';
+        ui.matchMinute.textContent = '—';
+        ui.scoreCaption.textContent = 'Счёт и минута появятся автоматически после старта матча.';
+      }
+    }
+
+    function initPlayer() {
+      if (!STREAM_URL) return;
+      const video = document.getElementById('video');
+
+      if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        video.src = STREAM_URL;
+      } else if (window.Hls && Hls.isSupported()) {
+        const hls = new Hls({ lowLatencyMode: true });
+        hls.loadSource(STREAM_URL);
+        hls.attachMedia(video);
+      }
+    }
+
+    async function updateMatch() {
+      if (!MATCH_API_URL) {
+        renderMatch(fallbackData);
+        return;
+      }
+
+      try {
+        const response = await fetch(MATCH_API_URL, { cache: 'no-store' });
+        if (!response.ok) throw new Error('bad response');
+        const data = await response.json();
+        renderMatch({ ...fallbackData, ...data });
+      } catch (error) {
+        renderMatch(fallbackData);
+      }
+    }
+
+    renderMatch(fallbackData);
+    initPlayer();
+    updateMatch();
+    setInterval(updateMatch, POLL_INTERVAL);
+  </script>
+</body>
+</html>
